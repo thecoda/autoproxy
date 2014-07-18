@@ -1,4 +1,4 @@
-package sandbox.proxytests
+package autoproxy.proxytests
 
 object RunEmAll extends App {
 

@@ -1,4 +1,4 @@
-package sandbox
+package autoproxy
 
 import scala.reflect.macros.whitebox.Context
 

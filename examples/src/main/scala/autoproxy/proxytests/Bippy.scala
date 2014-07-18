@@ -1,6 +1,6 @@
-package sandbox.proxytests
+package autoproxy.proxytests
 
-import sandbox.{delegating, proxy}
+import autoproxy.{delegating, proxy}
 
 object inner {
   trait SomeTrait
@@ -18,7 +18,7 @@ object DoublingBippy extends Bippy {
   def bippy(i: Int) = (i*2).toString
 }
 
-@delegating class BippyValParamWrapper(@proxy val dg : Bippy) extends sandbox.proxytests.inner.SomeTrait {
+@delegating class BippyValParamWrapper(@proxy val dg : Bippy) extends autoproxy.proxytests.inner.SomeTrait {
   def one(s: String) = s
   def two(i: Int) = i
   def three[T](x: T) = x
@@ -52,12 +52,12 @@ object DoublingBippy extends Bippy {
 //  @proxy val two: Bippy = DoublingBippy
 //}
 
-class Jeopardy[T] {
-  private var it: T = _
-  def doit(): T = it
-}
+//class Jeopardy[T] {
+//  private var it: T = _
+//  def doit(): T = it
+//}
 
-@delegating class DoubleJeopardy {
-  @proxy val one = new Jeopardy[Int]
-  @proxy val two = new Jeopardy[String]
-}
+//@delegating class DoubleJeopardy {
+//  @proxy val one = new Jeopardy[Int]
+//  @proxy val two = new Jeopardy[String]
+//}

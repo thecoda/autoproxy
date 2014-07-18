@@ -1,4 +1,4 @@
-package sandbox
+package autoproxy
 
 /**
  * Shamelessly liberated from the async macro
@@ -13,7 +13,7 @@ object LogUtils {
   private def verbose = enabled("debug")
   private def trace   = enabled("trace")
 
-  private[sandbox] def vprintln(s: => Any): Unit = if (verbose) println(s"[autoproxy] $s")
+  private[autoproxy] def vprintln(s: => Any): Unit = if (verbose) println(s"[autoproxy] $s")
 
-  private[sandbox] def trace(s: => Any): Unit = if (trace) println(s"[autoproxy] $s")
+  private[autoproxy] def trace(s: => Any): Unit = if (trace) println(s"[autoproxy] $s")
 }

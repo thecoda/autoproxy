@@ -1,4 +1,4 @@
-package sandbox
+package autoproxy
 
 import scala.language.experimental.macros
 import scala.reflect.macros.whitebox.Context
@@ -55,7 +55,7 @@ trait MacroBase {
   val c: Context
 }
 
-trait DelegatingMacro extends MacroBase with ClassCalculus {
+trait DelegatingMacro extends MacroBase with ClassCalculus with TreeSafety {
   import c.universe._
 
   def posErr(s: String) = c.error(c.enclosingPosition,s)
@@ -65,32 +65,24 @@ trait DelegatingMacro extends MacroBase with ClassCalculus {
   def showProxyUsageError(): Unit = posErr("The @proxy annotation can only be used on params, vals, vars or methods")
 
 
-
-  def treeOf[T <: ImplDef](impl: T): T =
-    //typeCheckExpressionOfType(impl).asInstanceOf[T]
-    c.typecheck(impl.duplicate, silent = true, withMacrosDisabled = true).asInstanceOf[T]
-
-  def typeSymOf(impl: ImplDef): TypeSymbol =
-    treeOf(impl).symbol.asType
-
-  def injectMembers(templ: Template, newMembers: Seq[Tree], newInterfaces: List[Tree]): Template = {
+  def injectIntoTemplate(templ: Template, newMembers: Seq[Tree], newInterfaces: List[Tree]): Template = {
     vprintln(s"templateParents = ${templ.parents}}")
     vprintln(s"injecting interfaces = ${newInterfaces}")
     Template(templ.parents ++ newInterfaces, templ.self, templ.body ++ newMembers)
   }
 
 
-  def injectMembers[T <: ImplDef](impl: T, newMembers: Seq[Tree], newInterfaces: List[Tree]): T = impl match {
+  def injectIntoImpl[T <: ImplDef](impl: T, newMembers: Seq[Tree], newInterfaces: List[Tree]): T = impl match {
     case ClassDef(mods, name, tparams, templ) =>
-      ClassDef(mods, name, tparams, injectMembers(templ, newMembers, newInterfaces)).asInstanceOf[T]
+      ClassDef(mods, name, tparams, injectIntoTemplate(templ, newMembers, newInterfaces)).asInstanceOf[T]
 
     case ModuleDef(mods, name, templ) =>
-      ModuleDef(mods, name, injectMembers(templ, newMembers, newInterfaces)).asInstanceOf[T]
+      ModuleDef(mods, name, injectIntoTemplate(templ, newMembers, newInterfaces)).asInstanceOf[T]
   }
 
   def hasProxyAnnotation(sym: Symbol): Boolean = {
 //    println("annotations: " + sym.annotations.mkString(","))
-    sym.annotations.exists(_.tree.toString == "new sandbox.proxytag()")
+    sym.annotations.exists(_.tree.toString == "new autoproxy.proxytag()")
   }
 
   def proxyPivots(tpe: TypeSymbol): List[Symbol] = {
@@ -150,7 +142,7 @@ trait DelegatingMacro extends MacroBase with ClassCalculus {
       val Modifiers(flags, privateWithin, annotations) = mods
       val updatedannotations = annotations map { ann => ann match {
         case q"new $p()" if p.toString.endsWith("proxy") =>
-          q"new sandbox.proxytag()"
+          q"new autoproxy.proxytag()"
         case x => x
       }}
       Modifiers(flags, privateWithin, updatedannotations)
@@ -163,7 +155,7 @@ trait DelegatingMacro extends MacroBase with ClassCalculus {
 
   def processClass(clazz0: ClassDef): Tree = {
     val clazz = tagProxyAnnotations(clazz0)
-    val clazzSym = symOf(treeOf(clazz))
+    val clazzSym = clazz.typechecked.safeSym
     val pivots = proxyPivots(clazzSym)
 
     val workSummary = summariseWork(clazzSym, pivots)
@@ -178,12 +170,12 @@ trait DelegatingMacro extends MacroBase with ClassCalculus {
 //    }
 
     if(c.hasErrors) clazz
-    else injectMembers(clazz.duplicate.asInstanceOf[ClassDef], mkDelegates(pivotProvidedMethods), pivotProvidedInterfaceTrees)
+    else injectIntoImpl(clazz.safeDuplicate, mkDelegates(pivotProvidedMethods), pivotProvidedInterfaceTrees)
   }
 
   def processModule(mod0: ModuleDef): ModuleDef = {
     val mod = tagProxyAnnotations(mod0)
-    val modSym = symOf(treeOf(mod))
+    val modSym = mod.typechecked.safeSym
     val modClassSym = modSym.moduleClass.asClass
     val pivots = proxyPivots(modClassSym)
 
@@ -198,7 +190,7 @@ trait DelegatingMacro extends MacroBase with ClassCalculus {
 //      vprintln(s"Provided interfaces for ${pivot.name} = ${interfaces.mkString}")
 //    }
 
-    val newClassDef = injectMembers(mod.duplicate.asInstanceOf[ModuleDef], mkDelegates(pivotProvidedMethods), pivotProvidedInterfaceTrees)
+    val newClassDef = injectIntoImpl(mod.safeDuplicate, mkDelegates(pivotProvidedMethods), pivotProvidedInterfaceTrees)
     newClassDef
   }
 

@@ -1,13 +1,9 @@
-package sandbox
+package autoproxy
 
 import scala.collection.breakOut
 
-trait ClassCalculus extends MacroBase {
+trait ClassCalculus { self: MacroBase with TreeSafety =>
   import c.universe._
-
-  def symOf(x: ClassDef) = x.symbol.asClass
-  def symOf(x: ModuleDef) = x.symbol.asModule
-  def symOf(x: DefDef) = x.symbol.asMethod
 
 
   def methodsOn(s: Symbol, optSite: Type = NoType): Set[(MethodSymbol,Type)] = {
@@ -66,17 +62,21 @@ trait ClassCalculus extends MacroBase {
       p -> (p.info.baseClasses filterNot existingInterfaces.contains filterNot (_.toString == p.toString))
     }(breakOut)
 
-    private def stringDistinct[T](xs: List[T]): List[T] = {
+
+    private def distinctBy[T,D](xs: List[T], fn: T => D): List[T] = {
       val b = List.newBuilder[T]
-      val seen = collection.mutable.HashSet[String]()
+      val seen = collection.mutable.HashSet[D]()
       for (x <- xs) {
-        if (!seen(x.toString)) {
+        val d = fn(x)
+        if (!seen(d)) {
           b += x
-          seen += x.toString
+          seen += d
         }
       }
       b.result()
     }
+
+    private def stringDistinct[T](xs: List[T]): List[T] = distinctBy(xs, _.toString)
 
     val pivotProvidedInterfaceTrees: List[Tree] = stringDistinct(
       for {
@@ -117,4 +117,14 @@ trait ClassCalculus extends MacroBase {
     def pivotProvidedInterfaceTrees: List[Tree]
   }
 
+
+  class ClassSummary(val sym: ClassSymbol) {
+    def info: Type
+
+    def methods: Set[MethodSymbol]
+    def abstractMethods: Set[MethodSymbol]
+    def concreteMethods: Set[MethodSymbol]
+
+    def interfaces: Set[Symbol]
+  }
 }
