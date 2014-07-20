@@ -1,13 +1,18 @@
 package autoproxy
 
 import scala.language.experimental.macros
+import scala.reflect.internal.util.Position
 import scala.reflect.macros.whitebox.Context
 import scala.annotation.compileTimeOnly
 import collection.breakOut
 import LogUtils._
 
+sealed trait InterfaceBehaviour
+object withInterfaces extends InterfaceBehaviour
+object withoutInterfaces extends InterfaceBehaviour
+
 @compileTimeOnly("`@proxy` must be enclosed in a class annotated as `@delegating`")
-class proxy extends scala.annotation.StaticAnnotation {
+class proxy(intf: InterfaceBehaviour = withInterfaces) extends scala.annotation.StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro DelegatingMacro.nakedProxyImpl
 }
 
@@ -15,10 +20,22 @@ class delegating extends scala.annotation.StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro DelegatingMacro.impl
 }
 
+class summarize extends scala.annotation.StaticAnnotation {
+  def macroTransform(annottees: Any*): Any = macro DelegatingMacro.summarizeImpl
+}
+
 class proxytag extends scala.annotation.StaticAnnotation
 
 
 object DelegatingMacro {
+
+  def summarizeImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
+    import c.universe._
+    println("enclosing pos: " + c.enclosingPosition)
+    //c.error(c.enclosingPosition,"`@summarize` isn't implemented yet")
+    val inputs = annottees.map(_.tree).toList
+    c.Expr[Any](Block(inputs, Literal(Constant(()))))
+  }
 
   def nakedProxyImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
     c.abort(c.enclosingPosition,"`@proxy` must be enclosed in a class annotated as `@delegating`")

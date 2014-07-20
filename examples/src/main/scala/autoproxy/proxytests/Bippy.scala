@@ -1,6 +1,6 @@
 package autoproxy.proxytests
 
-import autoproxy.{delegating, proxy}
+import autoproxy.{proxytag, summarize, delegating, proxy}
 
 object inner {
   trait SomeTrait
@@ -45,6 +45,23 @@ object DoublingBippy extends Bippy {
     var y: String = ""
   }
   def y_=(txt: String): Unit = { props.y = txt + " banana"}
+}
+
+//class SummarizeThis(@proxytag val bippy: Bippy, @proxytag bippy2: Bippy) {
+//  @proxytag val bippy3: Bippy = SimpleBippy
+//  @proxytag private val bippy4: Bippy = SimpleBippy
+//  @proxytag object bippy5 extends Bippy {
+//    def bippy(i: Int) = i.toString
+//  }
+//}
+
+
+class SummarizeThis(val bippy: Bippy, @proxytag bippy2: Bippy) {
+  @proxytag val bippy3: Bippy = SimpleBippy
+  @proxytag private val bippy4: Bippy = SimpleBippy
+  @proxytag object bippy5 extends Bippy {
+    def bippy(i: Int) = i.toString
+  }
 }
 
 //@delegating class Clash {

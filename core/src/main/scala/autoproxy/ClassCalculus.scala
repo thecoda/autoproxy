@@ -63,7 +63,7 @@ trait ClassCalculus { self: MacroBase with TreeSafety =>
     }(breakOut)
 
 
-    private def distinctBy[T,D](xs: List[T], fn: T => D): List[T] = {
+    private def distinctBy[T,D](xs: List[T])(fn: T => D): List[T] = {
       val b = List.newBuilder[T]
       val seen = collection.mutable.HashSet[D]()
       for (x <- xs) {
@@ -76,7 +76,7 @@ trait ClassCalculus { self: MacroBase with TreeSafety =>
       b.result()
     }
 
-    private def stringDistinct[T](xs: List[T]): List[T] = distinctBy(xs, _.toString)
+    private def stringDistinct[T](xs: List[T]): List[T] = distinctBy(xs)(_.toString)
 
     val pivotProvidedInterfaceTrees: List[Tree] = stringDistinct(
       for {
@@ -118,13 +118,34 @@ trait ClassCalculus { self: MacroBase with TreeSafety =>
   }
 
 
-  class ClassSummary(val sym: ClassSymbol) {
-    def info: Type
+  object TypeSummary {
+    def apply(tpe: Type) = new TypeSummary(tpe)
 
-    def methods: Set[MethodSymbol]
-    def abstractMethods: Set[MethodSymbol]
-    def concreteMethods: Set[MethodSymbol]
+    def fromSymbol(sym: TypeSymbol, site: Type = NoType) = site match {
+      case NoType => TypeSummary(sym.info)
+      case x      => TypeSummary(sym infoIn x)
+    }
+  }
 
-    def interfaces: Set[Symbol]
+  class TypeSummary(val tpe: Type) {
+    private def ctorProvidedMemberSymbols : Set[MethodSymbol] = {
+      val ctors = tpe.decls.collect{ case ms: MethodSymbol if ms.isConstructor => ms }
+      val ctorParams = ctors.flatMap(_.paramLists.flatten)
+      ctorParams.collect{
+        case ms: MethodSymbol if ms.isVal || ms.isVar => ms
+      }(breakOut)
+    }
+
+    def methods: Set[MethodSummary] = (ctorProvidedMemberSymbols ++ tpe.members).collect{
+      case ms: MethodSymbol if !ms.isConstructor => MethodSummary(ms, TypeSummary(ms typeSignatureIn tpe))
+    }
+    def abstractMethods: Set[MethodSummary] = methods filter { _.sym.isAbstract }
+    def concreteMethods: Set[MethodSummary] = methods filterNot { _.sym.isAbstract }
+    def publicConcreteMethods: Set[MethodSummary] = concreteMethods filter { _.sym.isPublic }
+
+    def interfaces: List[ClassSymbol] = tpe.baseClasses.map(_.asClass)
+  }
+  
+  case class MethodSummary(val sym: MethodSymbol, val typeSummary: TypeSummary) {
   }
 }
