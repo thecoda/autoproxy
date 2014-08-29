@@ -22,14 +22,14 @@ object TopLevelBuild extends Build {
       "-unchecked",
       "-Xlint",
       "-encoding", "utf8",
-      "-Yrangepos",
+//      "-Yrangepos",
       "-Yno-adapted-args",
       "-Ywarn-dead-code",
       "-Ywarn-numeric-widen",   
       "-Ywarn-value-discard",
       "-Dautoproxy.debug=true",
-      "-Dautoproxy.trace=true"),
-    scalacOptions in (console) += "-Yrangepos"
+      "-Dautoproxy.trace=true")
+//    scalacOptions in (console) += "-Yrangepos"
     //scalacOptions in (Compile, compile) += "-P:wartremover:traverser:org.brianmckenna.wartremover.warts.Unsafe"
   )
 

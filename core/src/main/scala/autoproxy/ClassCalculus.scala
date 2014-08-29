@@ -42,16 +42,20 @@ trait ClassCalculus { self: MacroBase with TreeSafety =>
       )
     }(breakOut)
 
+    //this entire block just to spot duplicates and error if present
     {
       val flatProvidedMethods: Set[(MethodSymbol,Type)] = pivotProvidedMethods.flatMap(_._2)(breakOut)
       val methodsToProviders: Map[(MethodSymbol,Type), Set[Symbol]] = flatProvidedMethods.map{ case (m,sig) =>
-        val providers: Set[Symbol] = pivotProvidedMethods.collect{case (k,v) if v contains ((m,sig)) => k}(breakOut)
+        val providers: Set[Symbol] = pivotProvidedMethods.collect{case (p,ms) if ms contains ((m,sig)) => p}(breakOut)
         (m,sig) -> providers
       }(breakOut)
       val dupes = methodsToProviders.filter(_._2.size > 1)
-      //println("dupes: " + dupes)
+
+      def toStr(s: Symbol): String = (if (s.isParameter) "param " else "") + s.toString
+
       for(((method,sig), pivots) <- dupes) {
-        c.error(c.enclosingPosition, s"ambiguous proxy, the method '${method.name}${sig}' is provided by ${pivots.mkString("'", "' and '", "'")}")
+        val pivotsStr = pivots.toList.map(toStr).mkString("'", "' and '", "'")
+        c.error(c.enclosingPosition, s"ambiguous proxy, the method '${method.name}${sig}' is provided by ${pivotsStr}")
       }
     }
 
@@ -117,6 +121,10 @@ trait ClassCalculus { self: MacroBase with TreeSafety =>
     def pivotProvidedInterfaceTrees: List[Tree]
   }
 
+//  val ObjectTypeSummary: TypeSummary = {
+//    val tpe = typeOf[AnyRef]
+//    TypeSummary(tpe)
+//  }
 
   object TypeSummary {
     def apply(tpe: Type) = new TypeSummary(tpe)
@@ -144,8 +152,18 @@ trait ClassCalculus { self: MacroBase with TreeSafety =>
     def publicConcreteMethods: Set[MethodSummary] = concreteMethods filter { _.sym.isPublic }
 
     def interfaces: List[ClassSymbol] = tpe.baseClasses.map(_.asClass)
+
+    private def describeMethods(xs: Set[MethodSummary]) = xs.map(_.description).mkString("\n    ", "\n    ", "\n")
+    def description: String =
+      s"""
+         | type: ${tpe.toString}
+         | abstractMethods: ${describeMethods(abstractMethods)}
+         | concreteMethods: ${describeMethods(concreteMethods)}
+         | publicConcreteMethods: ${describeMethods(publicConcreteMethods)}
+       """.stripMargin
   }
   
-  case class MethodSummary(val sym: MethodSymbol, val typeSummary: TypeSummary) {
+  case class MethodSummary(sym: MethodSymbol, typeSummary: TypeSummary) {
+    def description: String = sym.name.toString + " " + typeSummary.tpe.toString
   }
 }

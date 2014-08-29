@@ -31,10 +31,13 @@ object DelegatingMacro {
 
   def summarizeImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
     import c.universe._
-    println("enclosing pos: " + c.enclosingPosition)
-    //c.error(c.enclosingPosition,"`@summarize` isn't implemented yet")
+    val theMacro = mkInstance(c)
+
     val inputs = annottees.map(_.tree).toList
-    c.Expr[Any](Block(inputs, Literal(Constant(()))))
+    val code = theMacro.summarize(inputs)
+    c.Expr[Any](Block(code, Literal(Constant(()))))
+
+//    c.abort(c.enclosingPosition,"`@summarize` isn't implemented yet")
   }
 
   def nakedProxyImpl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
@@ -108,14 +111,24 @@ trait DelegatingMacro extends MacroBase with ClassCalculus with TreeSafety {
       case ms: MethodSymbol if ms.isConstructor => ms
     }.flatMap(_.paramLists.flatten)
 
-    val candidates = ctorParams ++ tpeInfo.decls
+    val candidates: Iterable[Symbol] = ctorParams ++ tpeInfo.decls
+//    val candidates: Iterable[Symbol] = tpeInfo.decls
 //    val candidateTrees = candidates.map(_.tree)
     vprintln(s"candidate pivots for ${tpe.name} = $candidates")
 
+    var seen = Set.empty[String]
+
     val pivots: List[Symbol] = candidates.flatMap{
-      case s: Symbol if hasProxyAnnotation(s) => println("identified pivot: " + showRaw(s)); List(s)
-      case s: Symbol => vprintln("ignoring symbol " + showRaw(s) + " with " + s.annotations.map(_.tree)); Nil
-      case x => vprintln("ignoring non-symbol " + x); Nil
+      case s: Symbol if hasProxyAnnotation(s) && !seen(s.toString) =>
+        vprintln(s"identified pivot for ${tpe.name}: '${s}'")
+        seen += s.toString
+        List(s)
+      case s: Symbol =>
+        vprintln("ignoring symbol " + showRaw(s) + " with " + s.annotations.map(_.tree))
+        Nil
+      case x =>
+        vprintln("ignoring non-symbol " + x)
+        Nil
     }(breakOut)
 
     vprintln(s"pivots for ${tpe.name} = $pivots")
@@ -216,6 +229,25 @@ trait DelegatingMacro extends MacroBase with ClassCalculus with TreeSafety {
     case (clazz: ClassDef) :: Nil       => processClass(clazz) :: q"object ${clazz.name.toTermName}" :: Nil
     case (clazz: ClassDef) :: rest      => processClass(clazz) :: rest
     case (singleton: ModuleDef) :: rest => processModule(singleton) :: rest
+    case _                              => showDelegateUsageError(); inputs
+  }
+
+  def summarizeClass(clazz: ClassDef): Tree = {
+    val clazzSym = clazz.typechecked.safeSym
+
+    val summary = TypeSummary.fromSymbol(clazzSym)
+//    val ar = typeOf[AnyRef]
+//    println(typeOf[AnyRef])
+    println(summary.description)
+//    println(ObjectTypeSummary.description)
+    clazz
+  }
+
+  def summarize(inputs: List[Tree]): List[Tree] = inputs match {
+    // Workaround here for https://github.com/scalamacros/paradise/issues/50 when the class lacks a companion
+    case (clazz: ClassDef) :: Nil       => summarizeClass(clazz) :: q"object ${clazz.name.toTermName}" :: Nil
+    case (clazz: ClassDef) :: rest      => summarizeClass(clazz) :: rest
+//    case (singleton: ModuleDef) :: rest => processModule(singleton) :: rest
     case _                              => showDelegateUsageError(); inputs
   }
 }
